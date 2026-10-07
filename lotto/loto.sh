@@ -1,51 +1,114 @@
 #!/bin/bash
-# Skript genereerib 5 erinevat lotonumbrit (1-50) ja salvestab või kuvab need
+# Loto 5/50 mängu skript (funktsioonipõhine struktuur)
 
-ajutine_fail="tmp_loto.txt"
-> "$ajutine_fail" # Tühjendame vana ajutise faili, kui see on olemas
+AJUTINE_FAIL="tmp_loto.txt"
+TULEMUSED_FAIL="lotonumbrid.txt"
 
-# Genereerime numbreid seni, kuni ajutises failis on täpselt 5 rida
-while [ $(wc -l < "$ajutine_fail") -lt 5 ]; do
-    # Moodustame juhusliku arvu vahemikus 1–50
-    arv=$(( (RANDOM % 50) + 1 ))
-    
-    # Kontrollime, kas arv on juba ajutises failis olemas (-x nõuab täpset rea kattuvust)
-    if ! grep -x -q "$arv" "$ajutine_fail"; then
-        echo "$arv" >> "$ajutine_fail"
+show_header() {
+    echo "========================================"
+    echo "           LOTO 5 / 50 MÄNG             "
+    echo "========================================"
+}
+
+clear_files() {
+    > "$AJUTINE_FAIL"
+}
+
+read_player() {
+    echo -n "Sisesta oma nimi: "
+    read mängija_nimi
+    if [ -z "$mängija_nimi" ]; then
+        mängija_nimi="Kasutaja"
     fi
-done
+}
 
-# Vormindame väljundi
-numbrid=$(tr '\n' ' ' < "$ajutine_fail")
-praegune_aeg=$(date "+%Y-%m-%d %H:%M:%S")
-
-echo "----------------------------------------"
-echo "Kuhu soovite tulemuse väljastada?"
-echo "1) Terminali (stdout)"
-echo "2) Salvestada faili koos kellaajaga"
-echo -n "Valik (1 või 2): "
-read valik
-
-if [ "$valik" -eq 1 ]; then
+read_player_numbers() {
     echo ""
-    echo "Kuupäev ja kellaaeg: $praegune_aeg"
-    echo "Genereeritud numbrid: $numbrid"
-elif [ "$valik" -eq 2 ]; then
-    echo -n "Sisesta faili nimi (nt lotonumbrid.txt): "
-    read failinimi
+    echo "Sisesta 5 erinevat numbrit vahemikus 1–50:"
+    mängija_numbrid=""
+    count=1
     
-    # Kui kasutaja eirab nime sisestamist, kasutame vaikimisi nime
-    if [ -z "$failinimi" ]; then
-        failinimi="lotonumbrid.txt"
-    fi
-    
-    # Lisame tulemuse faili lõppu (ei kirjuta üle)
-    echo "Aeg: $praegune_aeg | Numbrid: $numbrid" >> "$failinimi"
-    echo "Tulemus edukalt salvestatud faili '$failinimi'."
-else
-    echo "Vigane valik! Kuvame tulemuse terminalis:"
-    echo "Aeg: $praegune_aeg | Numbrid: $numbrid"
-fi
+    while [ $count -le 5 ]; do
+        echo -n "Sisesta $count. number: "
+        read nr
+        
+        # Kontroll, kas sisend on täisarv vahemikus 1-50
+        if ! [[ "$nr" =~ ^[0-9]+$ ]] || [ "$nr" -lt 1 ] || [ "$nr" -gt 50 ]; then
+            echo "Viga! Sisesta arv vahemikus 1 kuni 50."
+            continue
+        fi
+        
+        # Kontroll, kas number on juba varem sisestatud
+        if echo "$mängija_numbrid" | grep -qw "$nr"; then
+            echo "Viga! Seda numbrit oled juba sisestanud."
+            continue
+        fi
+        
+        mängija_numbrid="$mängija_numbrid $nr"
+        count=$((count + 1))
+    done
+}
 
-# Kustutame ajutise faili
-rm -f "$ajutine_fail"
+show_player_numbers() {
+    echo ""
+    echo "Sinu valitud numbrid: $mängija_numbrid"
+}
+
+generate_lottery_numbers() {
+    while [ $(wc -l < "$AJUTINE_FAIL") -lt 5 ]; do
+        arv=$(( (RANDOM % 50) + 1 ))
+        if ! grep -x -q "$arv" "$AJUTINE_FAIL"; then
+            echo "$arv" >> "$AJUTINE_FAIL"
+        fi
+    done
+    võidunumbrid=$(tr '\n' ' ' < "$AJUTINE_FAIL")
+}
+
+show_lottery_numbers() {
+    echo "Loto võidunumbrid:    $võidunumbrid"
+}
+
+check_matches() {
+    tabamused=0
+    tabatud_numbrid=""
+    for nr in $mängija_numbrid; do
+        if grep -x -q "$nr" "$AJUTINE_FAIL"; then
+            tabamused=$((tabamused + 1))
+            tabatud_numbrid="$tabatud_numbrid $nr"
+        fi
+    done
+}
+
+show_result() {
+    echo "----------------------------------------"
+    echo "Tulemus: $mängija_nimi, täppi läks $tabamused numbrit 5-st!"
+    if [ $tabamused -gt 0 ]; then
+        echo "Tabatud numbrid: $tabatud_numbrid"
+    fi
+    echo "----------------------------------------"
+}
+
+save_result() {
+    echo -n "Kas soovid tulemuse salvestada faili? (j/n): "
+    read valik
+    if [ "$valik" = "j" ] || [ "$valik" = "J" ]; then
+        praegune_aeg=$(date "+%Y-%m-%d %H:%M:%S")
+        echo "Aeg: $praegune_aeg | Mängija: $mängija_nimi | Sinu numbrid: $mängija_numbrid | Võidunumbrid: $võidunumbrid | Tabamused: $tabamused" >> "$TULEMUSED_FAIL"
+        echo "Tulemus edukalt salvestatud faili '$TULEMUSED_FAIL'."
+    fi
+    rm -f "$AJUTINE_FAIL"
+}
+
+# ========================================
+#          PROGRAMMI PÕHIOSA
+# ========================================
+show_header
+clear_files
+read_player
+read_player_numbers
+show_player_numbers
+generate_lottery_numbers
+show_lottery_numbers
+check_matches
+show_result
+save_result
